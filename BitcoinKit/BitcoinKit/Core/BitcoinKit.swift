@@ -1,6 +1,5 @@
 import BitcoinCore
 import HSHDWalletKit
-import Hodler
 import BigInt
 import HSCryptoKit
 import RxSwift
@@ -9,6 +8,9 @@ public class BitcoinKit: AbstractKit {
     private static let name = "BitcoinKit"
 
     public enum NetworkType: String, CaseIterable { case mainNet, testNet, regTest }
+
+    private let storage: IStorage
+    private let bech32AddressConverter: IAddressConverter
 
     public weak var delegate: BitcoinCoreDelegate? {
         didSet {
@@ -35,16 +37,11 @@ public class BitcoinKit: AbstractKit {
 
         let databaseFilePath = try DirectoryHelper.directoryURL(for: BitcoinKit.name).appendingPathComponent(BitcoinKit.databaseFileName(walletId: walletId, networkType: networkType)).path
         let storage = GrdbStorage(databaseFilePath: databaseFilePath)
+        self.storage = storage
 
         let paymentAddressParser = PaymentAddressParser(validScheme: "bitcoin", removeScheme: true)
-        let scriptConverter = ScriptConverter()
-        let bech32AddressConverter = SegWitBech32AddressConverter(prefix: network.bech32PrefixPattern, scriptConverter: scriptConverter)
 
-        let bitcoinCoreBuilder = BitcoinCoreBuilder(minLogLevel: minLogLevel)
-
-        let hodler = HodlerPlugin(addressConverter: bitcoinCoreBuilder.addressConverter, blockMedianTimeHelper: BlockMedianTimeHelper(storage: storage), publicKeyStorage: storage)
-        
-        let bitcoinCore = try bitcoinCoreBuilder
+        let bitcoinCore = try BitcoinCoreBuilder(minLogLevel: minLogLevel)
                 .set(network: network)
                 .set(initialSyncApi: initialSyncApi)
                 .set(words: words)
@@ -55,13 +52,16 @@ public class BitcoinKit: AbstractKit {
                 .set(peerSize: 10)
                 .set(syncMode: syncMode)
                 .set(storage: storage)
-                .add(plugin: hodler)
                 .build()
+
+        let scriptConverter = ScriptConverter()
+        bech32AddressConverter = SegWitBech32AddressConverter(prefix: network.bech32PrefixPattern, scriptConverter: scriptConverter)
 
         super.init(bitcoinCore: bitcoinCore, network: network)
 
         // extending BitcoinCore
 
+        bitcoinCore.prepend(scriptBuilder: SegWitScriptBuilder())
         bitcoinCore.prepend(addressConverter: bech32AddressConverter)
 
         let blockHelper = BlockValidatorHelper(storage: storage)
@@ -83,6 +83,18 @@ public class BitcoinKit: AbstractKit {
         }
     }
 
+    override open var debugInfo: String {
+        var lines = [String](arrayLiteral: bitcoinCore.debugInfo)
+        let pubKeys = storage.publicKeys().sorted(by: { $0.index < $1.index })
+
+        lines.append("--------------- Bitcoin Segwit (zero program) addresses --------------------")
+        for pubKey in pubKeys {
+            lines.append("acc: \(pubKey.account) - inx: \(pubKey.index) - ext: \(pubKey.external) : \(try! bech32AddressConverter.convert(keyHash: Data([0x00, 0x14]) + pubKey.keyHash, type: .p2wpkh).stringValue)") 
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
 }
 
 extension BitcoinKit {
@@ -100,7 +112,7 @@ extension BitcoinKit {
     }
 
     private static func databaseFileName(walletId: String, networkType: NetworkType) -> String {
-        "\(walletId)-\(networkType.rawValue)"
+        return "\(walletId)-\(networkType.rawValue)"
     }
 
 }
