@@ -23,7 +23,7 @@ public class Input: Record {
 
 
     override open class var databaseTableName: String {
-        "inputs"
+        return "inputs"
     }
 
     enum Columns: String, ColumnExpression, CaseIterable {

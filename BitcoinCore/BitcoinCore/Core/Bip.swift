@@ -1,6 +1,6 @@
 import HSHDWalletKit
 
-public enum Bip: CustomStringConvertible {
+public enum Bip {
     case bip44
     case bip49
     case bip84
@@ -26,14 +26,6 @@ public enum Bip: CustomStringConvertible {
         case .bip44: return Bip44RestoreKeyConverter(addressConverter: addressConverter)
         case .bip49: return Bip49RestoreKeyConverter(addressConverter: addressConverter)
         case .bip84: return Bip84RestoreKeyConverter(addressConverter: addressConverter)
-        }
-    }
-
-    public var description: String {
-        switch self {
-        case .bip44: return "bip44"
-        case .bip49: return "bip49"
-        case .bip84: return "bip84"
         }
     }
 

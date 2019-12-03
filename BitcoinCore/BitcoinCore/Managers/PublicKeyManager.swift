@@ -33,7 +33,7 @@ class PublicKeyManager {
             }
         }
 
-        addKeys(keys: keys)
+        try addKeys(keys: keys)
     }
 
     private func gapKeysCount(publicKeyResults publicKeysWithUsedStates: [PublicKeyWithUsedState]) -> Int {
@@ -84,7 +84,7 @@ extension PublicKeyManager: IPublicKeyManager {
         bloomFilterManager?.regenerateBloomFilter()
     }
 
-    func addKeys(keys: [PublicKey]) {
+    func addKeys(keys: [PublicKey]) throws {
         guard !keys.isEmpty else {
             return
         }

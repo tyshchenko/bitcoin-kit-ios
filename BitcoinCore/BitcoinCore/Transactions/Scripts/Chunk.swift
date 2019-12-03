@@ -13,7 +13,7 @@ public class Chunk: Equatable {
         return scriptData.subdata(in: payloadRange)
     }
 
-    public init(scriptData: Data, index: Int, payloadRange: Range<Int>? = nil) {
+    init(scriptData: Data, index: Int, payloadRange: Range<Int>? = nil) {
         self.scriptData = scriptData
         self.index = index
         self.payloadRange = payloadRange

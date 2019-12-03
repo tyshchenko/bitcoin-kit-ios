@@ -1,10 +1,12 @@
 open class TransactionInfoConverter: ITransactionInfoConverter {
-    public var baseTransactionInfoConverter: IBaseTransactionInfoConverter!
+    private let baseTransactionInfoConverter: IBaseTransactionInfoConverter
 
-    public init() {}
+    public init(baseTransactionInfoConverter: IBaseTransactionInfoConverter) {
+        self.baseTransactionInfoConverter = baseTransactionInfoConverter
+    }
 
     public func transactionInfo(fromTransaction transactionForInfo: FullTransactionForInfo) -> TransactionInfo {
-        baseTransactionInfoConverter.transactionInfo(fromTransaction: transactionForInfo)
+        return baseTransactionInfoConverter.transactionInfo(fromTransaction: transactionForInfo)
     }
 
 }

@@ -35,10 +35,6 @@ class GetBlockHashesTask: PeerTask {
         super.init(dateGenerator: dateGenerator)
     }
 
-    override var state: String {
-        "expectedHashesMinCount: \(expectedHashesMinCount); allowedIdleTime: \(allowedIdleTime)"
-    }
-
     override func start() {
         if let requester = requester {
             requester.send(message: GetBlocksMessage(protocolVersion: requester.protocolVersion, headerHashes: blockLocatorHashes))

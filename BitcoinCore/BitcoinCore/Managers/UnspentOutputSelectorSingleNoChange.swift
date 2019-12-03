@@ -14,32 +14,28 @@ public class UnspentOutputSelectorSingleNoChange {
 
 extension UnspentOutputSelectorSingleNoChange: IUnspentOutputSelector {
 
-    public func select(value: Int, feeRate: Int, outputScriptType: ScriptType = .p2pkh, changeType: ScriptType = .p2pkh, senderPay: Bool, dust: Int, pluginDataOutputSize: Int) throws -> SelectedUnspentOutputInfo {
-        let unspentOutputs = provider.spendableUtxo
+    public func select(value: Int, feeRate: Int, outputScriptType: ScriptType = .p2pkh, changeType: ScriptType = .p2pkh, senderPay: Bool) throws -> SelectedUnspentOutputInfo {
+        let unspentOutputs = provider.allUnspentOutputs
 
-        guard value >= dust else {
-            throw BitcoinCoreErrors.SendValueErrors.dust
+        guard value > 0 else {
+            throw BitcoinCoreErrors.UnspentOutputSelection.wrongValue
         }
         guard !unspentOutputs.isEmpty else {
-            throw BitcoinCoreErrors.SendValueErrors.emptyOutputs
+            throw BitcoinCoreErrors.UnspentOutputSelection.emptyOutputs
         }
+        let dust = (calculator.inputSize(type: changeType) + calculator.outputSize(type: changeType)) * feeRate // fee needed for make changeOutput, we use only p2pkh for change output
 
         // try to find 1 unspent output with exactly matching value
         for unspentOutput in unspentOutputs {
             let output = unspentOutput.output
-            let fee = calculator.transactionSize(inputs: [output.scriptType], outputScriptTypes: [outputScriptType], pluginDataOutputSize: pluginDataOutputSize) * feeRate
-
-            let recipientValue = senderPay ? value : value - fee
-            let sentValue = senderPay ? value + fee : value
-
-            if (sentValue <= output.value) &&                 // output.value is enough
-                       (recipientValue >= dust) &&            // receivedValue won't be dust
-                       (output.value - sentValue < dust) {    // no need to add change output
-                return SelectedUnspentOutputInfo(unspentOutputs: [unspentOutput], recipientValue: recipientValue, changeValue: nil)
+            let fee = calculator.transactionSize(inputs: [output.scriptType], outputScriptTypes: [outputScriptType]) * feeRate
+            let totalFee = senderPay ? fee : 0
+            if (value + totalFee <= output.value) && (value + totalFee + dust > output.value) {
+                return SelectedUnspentOutputInfo(unspentOutputs: [unspentOutput], totalValue: output.value, fee: senderPay ? (output.value - value) : fee, addChangeOutput: false)
             }
         }
 
-        throw BitcoinCoreErrors.SendValueErrors.singleNoChangeOutputNotFound
+        throw BitcoinCoreErrors.UnspentOutputSelection.notEnough(maxFee: 0)
     }
 
 }

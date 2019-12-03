@@ -3,11 +3,8 @@ public protocol IBaseTransactionInfoConverter {
 }
 
 public class BaseTransactionInfoConverter: IBaseTransactionInfoConverter {
-    private let pluginManager: IPluginManager
 
-    public init(pluginManager: IPluginManager) {
-        self.pluginManager = pluginManager
-    }
+    public init() {}
 
     public func transactionInfo<T: TransactionInfo>(fromTransaction transactionForInfo: FullTransactionForInfo) -> T {
         var totalMineInput: Int = 0
@@ -15,7 +12,6 @@ public class BaseTransactionInfoConverter: IBaseTransactionInfoConverter {
         var fromAddresses = [TransactionAddressInfo]()
         var toAddresses = [TransactionAddressInfo]()
         var hasOnlyMyInputs = true
-        let transactionTimestamp = transactionForInfo.transactionWithBlock.transaction.timestamp
 
         for inputWithPreviousOutput in transactionForInfo.inputsWithPreviousOutputs {
             var mine = false
@@ -28,7 +24,7 @@ public class BaseTransactionInfoConverter: IBaseTransactionInfoConverter {
             }
 
             if let address = inputWithPreviousOutput.input.address {
-                fromAddresses.append(TransactionAddressInfo(address: address, mine: mine, pluginData: nil))
+                fromAddresses.append(TransactionAddressInfo(address: address, mine: mine))
             }
         }
 
@@ -41,7 +37,7 @@ public class BaseTransactionInfoConverter: IBaseTransactionInfoConverter {
             }
 
             if let address = output.address {
-                toAddresses.append(TransactionAddressInfo(address: address, mine: mine, pluginData: pluginManager.parsePluginData(from: output, transactionTimestamp: transactionTimestamp)))
+                toAddresses.append(TransactionAddressInfo(address: address, mine: mine))
             }
         }
 
@@ -62,7 +58,7 @@ public class BaseTransactionInfoConverter: IBaseTransactionInfoConverter {
                 amount: amount,
                 fee: resolvedFee,
                 blockHeight: transactionForInfo.transactionWithBlock.blockHeight,
-                timestamp: transactionTimestamp
+                timestamp: transactionForInfo.transactionWithBlock.transaction.timestamp
         )
     }
 

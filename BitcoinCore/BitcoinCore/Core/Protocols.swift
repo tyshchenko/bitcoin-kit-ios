@@ -97,7 +97,7 @@ public protocol IStorage {
     func add(block: Block) throws
     func delete(blocks: [Block]) throws
     func unstaleAllBlocks() throws
-    func timestamps(from startHeight: Int, to endHeight: Int) -> [Int]
+
 
     func transactionExists(byHash: Data) -> Bool
     func transaction(byHash: Data) -> Transaction?
@@ -138,7 +138,7 @@ public protocol IPublicKeyManager {
     func changePublicKey() throws -> PublicKey
     func receivePublicKey() throws -> PublicKey
     func fillGap() throws
-    func addKeys(keys: [PublicKey])
+    func addKeys(keys: [PublicKey]) throws
     func gapShifts() -> Bool
     func publicKey(byPath: String) throws -> PublicKey
 }
@@ -181,7 +181,6 @@ public protocol IPeer: class {
     var ready: Bool { get }
     var connected: Bool { get }
     var connectionTime: Double { get }
-    var tasks: [PeerTask] { get }
     func connect()
     func disconnect(error: Error?)
     func add(task: PeerTask)
@@ -250,7 +249,7 @@ protocol IFactory {
     func peer(withHost host: String, logger: Logger?) -> IPeer
     func transaction(version: Int, lockTime: Int) -> Transaction
     func inputToSign(withPreviousOutput: UnspentOutput, script: Data, sequence: Int) -> InputToSign
-    func output(withIndex index: Int, address: Address, value: Int, publicKey: PublicKey?) throws -> Output
+    func output(withValue value: Int, index: Int, lockingScript script: Data, type: ScriptType, address: String?, keyHash: Data?, publicKey: PublicKey?) -> Output
     func bloomFilter(withElements: [Data]) -> BloomFilter
 }
 
@@ -341,17 +340,20 @@ public protocol ITransactionSyncer: class {
 }
 
 public protocol ITransactionCreator {
-    func create(to address: String, value: Int, feeRate: Int, senderPay: Bool, pluginData: [UInt8: IPluginData]) throws -> FullTransaction
-    func create(from: UnspentOutput, to address: String, feeRate: Int) throws -> FullTransaction
+    func create(to address: String, value: Int, feeRate: Int, senderPay: Bool) throws -> FullTransaction
+    func create(to hash: Data, scriptType: ScriptType, value: Int, feeRate: Int, senderPay: Bool) throws -> FullTransaction
+    func create(from: UnspentOutput, to address: String, feeRate: Int, signatureScriptFunction: (Data, Data) -> Data) throws -> FullTransaction
 }
 
 protocol ITransactionBuilder {
-    func buildTransaction(toAddress: String, value: Int, feeRate: Int, senderPay: Bool, pluginData: [UInt8: IPluginData]) throws -> FullTransaction
-    func buildTransaction(from: UnspentOutput, toAddress: String, feeRate: Int) throws -> FullTransaction
+    func buildTransaction(value: Int, unspentOutputs: [UnspentOutput], fee: Int, senderPay: Bool, toAddress: Address, changeAddress: Address?, lastBlockHeight: Int) throws -> FullTransaction
+    func buildTransaction(from: UnspentOutput, to: Address, fee: Int, lastBlockHeight: Int, signatureScriptFunction: (Data, Data) -> Data) throws -> FullTransaction
 }
 
 protocol ITransactionFeeCalculator {
-    func fee(for value: Int, feeRate: Int, senderPay: Bool, toAddress: String?, pluginData: [UInt8: IPluginData]) throws -> Int
+    func fee(for value: Int, feeRate: Int, senderPay: Bool, toAddress: Address?, changeAddress: Address) throws -> Int
+    func feeWithUnspentOutputs(value: Int, feeRate: Int, toScriptType: ScriptType, changeScriptType: ScriptType, senderPay: Bool) throws -> SelectedUnspentOutputInfo
+    func fee(inputScriptType: ScriptType, outputScriptType: ScriptType, feeRate: Int, signatureScriptFunction: (Data, Data) -> Data) -> Int
 }
 
 protocol IBlockchain {
@@ -374,29 +376,23 @@ protocol IInputSigner {
     func sigScriptData(transaction: Transaction, inputsToSign: [InputToSign], outputs: [Output], index: Int) throws -> [Data]
 }
 
+public protocol IScriptBuilder {
+    func lockingScript(for address: Address) throws -> Data
+}
+
 public protocol ITransactionSizeCalculator {
     func transactionSize(inputs: [ScriptType], outputScriptTypes: [ScriptType]) -> Int
-    func transactionSize(inputs: [ScriptType], outputScriptTypes: [ScriptType], pluginDataOutputSize: Int) -> Int
     func outputSize(type: ScriptType) -> Int
     func inputSize(type: ScriptType) -> Int
-    func witnessSize(type: ScriptType) -> Int
     func toBytes(fee: Int) -> Int
 }
 
-protocol IDustCalculator {
-    func dust(type: ScriptType) -> Int
-}
-
 public protocol IUnspentOutputSelector {
-    func select(value: Int, feeRate: Int, outputScriptType: ScriptType, changeType: ScriptType, senderPay: Bool, dust: Int, pluginDataOutputSize: Int) throws -> SelectedUnspentOutputInfo
+    func select(value: Int, feeRate: Int, outputScriptType: ScriptType, changeType: ScriptType, senderPay: Bool) throws -> SelectedUnspentOutputInfo
 }
 
 public protocol IUnspentOutputProvider {
-    var spendableUtxo: [UnspentOutput] { get }
-}
-
-public protocol IBalanceProvider {
-    var balanceInfo: BalanceInfo { get }
+    var allUnspentOutputs: [UnspentOutput] { get }
 }
 
 public protocol IBlockSyncer: class {
@@ -428,7 +424,6 @@ public protocol ITransactionInfo: class {
 }
 
 public protocol ITransactionInfoConverter {
-    var baseTransactionInfoConverter: IBaseTransactionInfoConverter! { get set }
     func transactionInfo(fromTransaction transactionForInfo: FullTransactionForInfo) -> TransactionInfo
 }
 
@@ -436,15 +431,15 @@ protocol IDataProvider {
     var delegate: IDataProviderDelegate? { get set }
 
     var lastBlockInfo: BlockInfo? { get }
-    var balance: BalanceInfo { get }
-    func debugInfo(network: INetwork, scriptType: ScriptType, addressConverter: IAddressConverter) -> String
+    var balance: Int { get }
+    var debugInfo: String { get }
     func transactions(fromHash: String?, limit: Int?) -> Single<[TransactionInfo]>
 }
 
 protocol IDataProviderDelegate: class {
     func transactionsUpdated(inserted: [TransactionInfo], updated: [TransactionInfo])
     func transactionsDeleted(hashes: [String])
-    func balanceUpdated(balance: BalanceInfo)
+    func balanceUpdated(balance: Int)
     func lastBlockInfoUpdated(lastBlockInfo: BlockInfo)
 }
 
@@ -461,7 +456,6 @@ public protocol INetwork: class {
     var magic: UInt32 { get }
     var port: UInt32 { get }
     var dnsSeeds: [String] { get }
-    var dustRelayTxFee: Int { get }
     var bip44CheckpointBlock: Block { get }
     var lastCheckpointBlock: Block { get }
     var coinType: UInt32 { get }
@@ -514,7 +508,6 @@ public protocol IMessageSerializer {
 }
 
 public protocol IInitialBlockDownload {
-    var syncPeer: IPeer? { get }
     var hasSyncedPeer: Bool { get }
     var observable: Observable<InitialBlockDownloadEvent> { get }
     var syncedPeers: [IPeer] { get }
@@ -563,55 +556,4 @@ protocol IBloomFilterProvider: AnyObject {
 
 protocol IIrregularOutputFinder {
     func hasIrregularOutput(outputs: [Output]) -> Bool
-}
-
-public protocol IPlugin {
-    var id: UInt8 { get }
-    var maxSpendLimit: Int? { get }
-    func validate(address: Address) throws
-    func processOutputs(mutableTransaction: MutableTransaction, pluginData: IPluginData) throws
-    func processTransactionWithNullData(transaction: FullTransaction, nullDataChunks: inout IndexingIterator<[Chunk]>) throws
-    func isSpendable(unspentOutput: UnspentOutput) throws -> Bool
-    func inputSequenceNumber(output: Output) throws -> Int
-    func parsePluginData(from: Output, transactionTimestamp: Int) throws -> IPluginOutputData
-    func keysForApiRestore(publicKey: PublicKey) throws -> [String]
-}
-
-public protocol IPluginManager {
-    func validate(address: Address, pluginData: [UInt8: IPluginData]) throws
-    func maxSpendLimit(pluginData: [UInt8: IPluginData]) throws -> Int?
-    func add(plugin: IPlugin)
-    func processOutputs(mutableTransaction: MutableTransaction, pluginData: [UInt8: IPluginData]) throws
-    func processInputs(mutableTransaction: MutableTransaction) throws
-    func processTransactionWithNullData(transaction: FullTransaction, nullDataOutput: Output) throws
-    func isSpendable(unspentOutput: UnspentOutput) -> Bool
-    func parsePluginData(from: Output, transactionTimestamp: Int) -> [UInt8: IPluginOutputData]?
-}
-
-public protocol IBlockMedianTimeHelper {
-    var medianTimePast: Int? { get }
-    func medianTimePast(block: Block) -> Int?
-}
-
-protocol IOutputSetter {
-    func setOutputs(to mutableTransaction: MutableTransaction, toAddress: String, value: Int, pluginData: [UInt8: IPluginData]) throws
-}
-
-protocol IInputSetter {
-    func setInputs(to mutableTransaction: MutableTransaction, feeRate: Int, senderPay: Bool) throws
-    func setInputs(to mutableTransaction: MutableTransaction, fromUnspentOutput unspentOutput: UnspentOutput, feeRate: Int) throws
-}
-
-protocol ILockTimeSetter {
-    func setLockTime(to mutableTransaction: MutableTransaction)
-}
-
-protocol ITransactionSigner {
-    func sign(mutableTransaction: MutableTransaction) throws
-}
-
-public protocol IPluginData {
-}
-
-public protocol IPluginOutputData {
 }

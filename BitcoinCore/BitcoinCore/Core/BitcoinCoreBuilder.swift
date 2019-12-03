@@ -4,9 +4,6 @@ import HSHDWalletKit
 public class BitcoinCoreBuilder {
     public enum BuildError: Error { case noSeedData, noWalletId, noNetwork, noPaymentAddressParser, noAddressSelector, noStorage, noInitialSyncApi }
 
-    // chains
-    public let addressConverter = AddressConverterChain()
-
     // required parameters
     private var seed: Data?
     private var words: [String]?
@@ -15,7 +12,6 @@ public class BitcoinCoreBuilder {
     private var paymentAddressParser: IPaymentAddressParser?
     private var walletId: String?
     private var initialSyncApi: ISyncTransactionApi?
-    private var plugins = [IPlugin]()
     private var logger: Logger
 
     private var blockHeaderHasher: IHasher?
@@ -94,11 +90,6 @@ public class BitcoinCoreBuilder {
         return self
     }
 
-    public func add(plugin: IPlugin) -> BitcoinCoreBuilder {
-        plugins.append(plugin)
-        return self
-    }
-
     public init(minLogLevel: Logger.Level = .verbose) {
         self.logger = Logger(network: network, minLogLevel: minLogLevel)
     }
@@ -112,6 +103,9 @@ public class BitcoinCoreBuilder {
         } else {
             throw BuildError.noSeedData
         }
+//        guard let walletId = self.walletId else {
+//            throw BuildError.noWalletId
+//        }
         guard let network = self.network else {
             throw BuildError.noNetwork
         }
@@ -125,17 +119,17 @@ public class BitcoinCoreBuilder {
             throw BuildError.noInitialSyncApi
         }
 
-        let scriptConverter = ScriptConverter()
+        let addressConverter = AddressConverterChain()
         let restoreKeyConverterChain = RestoreKeyConverterChain()
-        let pluginManager = PluginManager(scriptConverter: scriptConverter, logger: logger)
 
-        plugins.forEach { pluginManager.add(plugin: $0) }
-        restoreKeyConverterChain.add(converter: pluginManager)
-
-        let unspentOutputProvider = UnspentOutputProvider(storage: storage, pluginManager: pluginManager, confirmationsThreshold: confirmationsThreshold)
-        var transactionInfoConverter = self.transactionInfoConverter ?? TransactionInfoConverter()
-        transactionInfoConverter.baseTransactionInfoConverter = BaseTransactionInfoConverter(pluginManager: pluginManager)
-        let dataProvider = DataProvider(storage: storage, balanceProvider: unspentOutputProvider, transactionInfoConverter: transactionInfoConverter)
+//        let dbName = "bitcoinkit-${network.javaClass}-$walletId"
+//        let database = KitDatabase.getInstance(context, dbName)
+//        let realmFactory = RealmFactory(dbName)
+//        let storage = Storage(database, realmFactory)
+//
+        let unspentOutputProvider = UnspentOutputProvider(storage: storage, confirmationsThreshold: confirmationsThreshold)
+        let transactionInfoConverter = self.transactionInfoConverter ?? TransactionInfoConverter(baseTransactionInfoConverter: BaseTransactionInfoConverter())
+        let dataProvider = DataProvider(storage: storage, unspentOutputProvider: unspentOutputProvider, transactionInfoConverter: transactionInfoConverter)
 
         let reachabilityManager = ReachabilityManager()
 
@@ -154,9 +148,10 @@ public class BitcoinCoreBuilder {
 
         let myOutputsCache = OutputsCache.instance(storage: storage)
         let irregularOutputFinder = IrregularOutputFinder(storage: storage)
+        let scriptConverter = ScriptConverter()
         let transactionInputExtractor = TransactionInputExtractor(storage: storage, scriptConverter: scriptConverter, addressConverter: addressConverter, logger: logger)
         let transactionKeySetter = TransactionPublicKeySetter(storage: storage)
-        let transactionOutputExtractor = TransactionOutputExtractor(transactionKeySetter: transactionKeySetter, pluginManager: pluginManager, logger: logger)
+        let transactionOutputExtractor = TransactionOutputExtractor(transactionKeySetter: transactionKeySetter, logger: logger)
         let transactionAddressExtractor = TransactionOutputAddressExtractor(storage: storage, addressConverter: addressConverter)
         let transactionProcessor = TransactionProcessor(storage: storage,
                 outputExtractor: transactionOutputExtractor, inputExtractor: transactionInputExtractor,
@@ -180,8 +175,7 @@ public class BitcoinCoreBuilder {
 
         let stateManager = StateManager(storage: storage, restoreFromApi: network.syncableFromApi && syncMode == BitcoinCore.SyncMode.api)
 
-        let errorStorage = ErrorStorage()
-        let initialSyncer = InitialSyncer(storage: storage, listener: kitStateProvider, stateManager: stateManager, blockDiscovery: blockDiscovery, publicKeyManager: publicKeyManager, logger: logger, errorStorage: errorStorage)
+        let initialSyncer = InitialSyncer(storage: storage, listener: kitStateProvider, stateManager: stateManager, blockDiscovery: blockDiscovery, publicKeyManager: publicKeyManager, logger: logger)
 
         let bloomFilterLoader = BloomFilterLoader(bloomFilterManager: bloomFilterManager, peerManager: peerManager)
         let watchedTransactionManager = WatchedTransactionManager()
@@ -198,16 +192,13 @@ public class BitcoinCoreBuilder {
         let syncedReadyPeerManager = SyncedReadyPeerManager(peerGroup: peerGroup, initialBlockDownload: initialBlockDownload)
 
         let inputSigner = InputSigner(hdWallet: hdWallet, network: network)
+        let scriptBuilder = ScriptBuilderChain()
         let transactionSizeCalculator = TransactionSizeCalculator()
-        let dustCalculator = DustCalculator(dustRelayTxFee: network.dustRelayTxFee, sizeCalculator: transactionSizeCalculator)
-        let outputSetter = OutputSetter(addressConverter: addressConverter, factory: factory, pluginManager: pluginManager)
-        let inputSetter = InputSetter(unspentOutputSelector: unspentOutputSelector, transactionSizeCalculator: transactionSizeCalculator, addressConverter: addressConverter, publicKeyManager: publicKeyManager, factory: factory, pluginManager: pluginManager, dustCalculator: dustCalculator, changeScriptType: bip.scriptType)
-        let lockTimeSetter = LockTimeSetter(storage: storage)
-        let transactionSigner = TransactionSigner(inputSigner: inputSigner)
-        let transactionBuilder = TransactionBuilder(outputSetter: outputSetter, inputSetter: inputSetter, lockTimeSetter: lockTimeSetter, signer: transactionSigner)
-        let transactionFeeCalculator = TransactionFeeCalculator(outputSetter: outputSetter, inputSetter: inputSetter, addressConverter: addressConverter, publicKeyManager: publicKeyManager, changeScriptType: bip.scriptType)
+        let transactionBuilder = TransactionBuilder(inputSigner: inputSigner, scriptBuilder: scriptBuilder, factory: factory)
+        let transactionFeeCalculator = TransactionFeeCalculator(unspentOutputSelector: unspentOutputSelector, transactionSizeCalculator: transactionSizeCalculator)
         let transactionSender = TransactionSender(transactionSyncer: transactionSyncer, peerManager: peerManager, initialBlockDownload: initialBlockDownload, syncedReadyPeerManager: syncedReadyPeerManager, logger: logger)
-        let transactionCreator = TransactionCreator(transactionBuilder: transactionBuilder, transactionProcessor: transactionProcessor, transactionSender: transactionSender, bloomFilterManager: bloomFilterManager)
+        let transactionCreator = TransactionCreator(transactionBuilder: transactionBuilder, transactionProcessor: transactionProcessor, transactionSender: transactionSender, transactionFeeCalculator: transactionFeeCalculator,
+                bloomFilterManager: bloomFilterManager, addressConverter: addressConverter, publicKeyManager: publicKeyManager, storage: storage, bip: bip)
 
         let syncManager = SyncManager(reachabilityManager: reachabilityManager, initialSyncer: initialSyncer, peerGroup: peerGroup)
 
@@ -225,18 +216,15 @@ public class BitcoinCoreBuilder {
                 restoreKeyConverterChain: restoreKeyConverterChain,
                 unspentOutputSelector: unspentOutputSelector,
                 kitStateProvider: kitStateProvider,
+                scriptBuilder: scriptBuilder,
                 transactionCreator: transactionCreator,
                 transactionFeeCalculator: transactionFeeCalculator,
-                dustCalculator: dustCalculator,
                 paymentAddressParser: paymentAddressParser,
                 networkMessageParser: networkMessageParser,
                 networkMessageSerializer: networkMessageSerializer,
                 syncManager: syncManager,
-                pluginManager: pluginManager,
                 watchedTransactionManager: watchedTransactionManager,
-                bip: bip,
-                peerManager: peerManager,
-                errorStorage: errorStorage)
+                bip: bip)
 
         initialSyncer.delegate = syncManager
         bloomFilterManager.delegate = bloomFilterLoader
@@ -251,6 +239,7 @@ public class BitcoinCoreBuilder {
         peerGroup.peerTaskHandler = bitcoinCore.peerTaskHandlerChain
         peerGroup.inventoryItemsHandler = bitcoinCore.inventoryItemsHandlerChain
 
+        bitcoinCore.prepend(scriptBuilder: ScriptBuilder())
         bitcoinCore.prepend(addressConverter: Base58AddressConverter(addressVersion: network.pubKeyHash, addressScriptVersion: network.scriptHash))
         bitcoinCore.prepend(unspentOutputSelector: UnspentOutputSelector(calculator: transactionSizeCalculator, provider: unspentOutputProvider))
         bitcoinCore.prepend(unspentOutputSelector: UnspentOutputSelectorSingleNoChange(calculator: transactionSizeCalculator, provider: unspentOutputProvider))

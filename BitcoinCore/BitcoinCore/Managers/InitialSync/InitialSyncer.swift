@@ -14,12 +14,10 @@ class InitialSyncer {
 
     private let logger: Logger?
     private let async: Bool
-    private let errorStorage: ErrorStorage?
 
     private var restoring = false
 
-    init(storage: IStorage, listener: ISyncStateListener, stateManager: IStateManager, blockDiscovery: IBlockDiscovery, publicKeyManager: IPublicKeyManager,
-         async: Bool = true, logger: Logger? = nil, errorStorage: ErrorStorage? = nil) {
+    init(storage: IStorage, listener: ISyncStateListener, stateManager: IStateManager, blockDiscovery: IBlockDiscovery, publicKeyManager: IPublicKeyManager, async: Bool = true, logger: Logger? = nil) {
         self.storage = storage
         self.listener = listener
         self.stateManager = stateManager
@@ -28,7 +26,6 @@ class InitialSyncer {
 
         self.logger = logger
         self.async = async
-        self.errorStorage = errorStorage
     }
 
     private func sync(forAccount account: Int) {
@@ -59,23 +56,27 @@ class InitialSyncer {
     }
 
     private func handle(forAccount account: Int, keys: [PublicKey], blockHashes: [BlockHash]) {
-        logger?.debug("Account \(account) has \(keys.count) keys and \(blockHashes.count) blocks")
-        publicKeyManager.addKeys(keys: keys)
+        do {
+            logger?.debug("Account \(account) has \(keys.count) keys and \(blockHashes.count) blocks")
+            try publicKeyManager.addKeys(keys: keys)
 
-        // If gap shift is found
-        if blockHashes.isEmpty {
-            stateManager.restored = true
-            delegate?.syncingFinished()
-        } else {
-            storage.add(blockHashes: blockHashes)
-            sync(forAccount: account + 1)
+            // If gap shift is found
+            if blockHashes.isEmpty {
+                stateManager.restored = true
+                delegate?.syncingFinished()
+            } else {
+                storage.add(blockHashes: blockHashes)
+                sync(forAccount: account + 1)
+            }
+
+        } catch {
+            handle(error: error)
         }
     }
 
     private func handle(error: Error) {
         stop()
         logger?.error(error)
-        errorStorage?.add(apiError: error)
         listener.syncStopped()
     }
 

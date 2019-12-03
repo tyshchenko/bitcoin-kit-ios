@@ -2,13 +2,15 @@ import Foundation
 
 public struct SelectedUnspentOutputInfo {
     public let unspentOutputs: [UnspentOutput]
-    public let recipientValue: Int              // amount to set to recipient output
-    public let changeValue: Int?                // amount to set to change output. No change output if nil
+    public let totalValue: Int                 // summary value on selected unspent unspentOutputs
+    public let fee: Int                        // fee for transaction with output(and maybe change output) and all selected inputs(unspent unspentOutputs) + maybe dust
+    public let addChangeOutput: Bool           // need to add changeOutput. Fee was calculated with change output
 
-    public init(unspentOutputs: [UnspentOutput], recipientValue: Int, changeValue: Int?) {
+    public init(unspentOutputs: [UnspentOutput], totalValue: Int, fee: Int, addChangeOutput: Bool) {
         self.unspentOutputs = unspentOutputs
-        self.recipientValue = recipientValue
-        self.changeValue = changeValue
+        self.totalValue = totalValue
+        self.fee = fee
+        self.addChangeOutput = addChangeOutput
     }
 }
 
@@ -28,16 +30,16 @@ public class UnspentOutputSelector {
 
 extension UnspentOutputSelector: IUnspentOutputSelector {
 
-    public func select(value: Int, feeRate: Int, outputScriptType: ScriptType = .p2pkh, changeType: ScriptType = .p2pkh, senderPay: Bool, dust: Int, pluginDataOutputSize: Int) throws -> SelectedUnspentOutputInfo {
-        let unspentOutputs = provider.spendableUtxo
+    public func select(value: Int, feeRate: Int, outputScriptType: ScriptType = .p2pkh, changeType: ScriptType = .p2pkh, senderPay: Bool) throws -> SelectedUnspentOutputInfo {
+        let unspentOutputs = provider.allUnspentOutputs
 
-        // check if value is not dust. recipientValue may be less, but not more
-        guard value >= dust else {
-            throw BitcoinCoreErrors.SendValueErrors.dust
+        guard value > 0 else {
+            throw BitcoinCoreErrors.UnspentOutputSelection.wrongValue
         }
         guard !unspentOutputs.isEmpty else {
-            throw BitcoinCoreErrors.SendValueErrors.emptyOutputs
+            throw BitcoinCoreErrors.UnspentOutputSelection.emptyOutputs
         }
+        let dust = (calculator.inputSize(type: changeType) + calculator.outputSize(type: changeType)) * feeRate // fee needed for make changeOutput, we use only p2pkh for change output
 
         let sortedOutputs = unspentOutputs.sorted(by: { lhs, rhs in lhs.output.value < rhs.output.value })
 
@@ -45,9 +47,9 @@ extension UnspentOutputSelector: IUnspentOutputSelector {
         var selectedOutputs = [UnspentOutput]()
         var selectedOutputScriptTypes = [ScriptType]()
         var totalValue = 0
-        var recipientValue = 0
-        var sentValue = 0
+
         var fee = 0
+        var lastCalculatedFee = 0
 
         for unspentOutput in sortedOutputs {
             selectedOutputs.append(unspentOutput)
@@ -64,42 +66,29 @@ extension UnspentOutputSelector: IUnspentOutputSelector {
                     totalValue -= outputValueToExclude
                 }
             }
-            fee = calculator.transactionSize(inputs: selectedOutputScriptTypes, outputScriptTypes: [outputScriptType], pluginDataOutputSize: pluginDataOutputSize) * feeRate
-
-            recipientValue = senderPay ? value : value - fee
-            sentValue = senderPay ? value + fee : value
-
-            if sentValue <= totalValue {      // totalValue is enough
-                if recipientValue >= dust {   // receivedValue won't be dust
-                    break
-                } else {
-                    // Here senderPay is false, because otherwise "dust" exception would throw far above.
-                    // Adding more UTXOs will make fee even greater, making recipientValue even less and dust anyway
-                    throw BitcoinCoreErrors.SendValueErrors.dust
-                }
+            lastCalculatedFee = calculator.transactionSize(inputs: selectedOutputScriptTypes, outputScriptTypes: [outputScriptType]) * feeRate
+            if senderPay {
+                fee = lastCalculatedFee
+            }
+            if totalValue >= lastCalculatedFee && totalValue >= value + fee {
+                break
             }
         }
 
-        // if all unspentOutputs are selected and total value less than needed, then throw error
-        if totalValue < sentValue {
-            throw BitcoinCoreErrors.SendValueErrors.notEnough
+        // if all unspentOutputs are selected and total value less than needed throw error
+        if totalValue < value + fee {
+            throw BitcoinCoreErrors.UnspentOutputSelection.notEnough(maxFee: fee)
         }
 
-        let changeOutputHavingTransactionFee = calculator.transactionSize(inputs: selectedOutputScriptTypes, outputScriptTypes: [outputScriptType, changeType], pluginDataOutputSize: pluginDataOutputSize) * feeRate
-        let withChangeRecipientValue = senderPay ? value : value - changeOutputHavingTransactionFee
-        let withChangeSentValue = senderPay ? value + changeOutputHavingTransactionFee : value
-        // if selected UTXOs total value >= recipientValue(toOutput value) + fee(for transaction with change output) + dust(minimum changeOutput value)
-        if totalValue >= withChangeRecipientValue + changeOutputHavingTransactionFee + dust {
-            // totalValue is too much, we must have change output
-            guard withChangeRecipientValue > dust else {
-                throw BitcoinCoreErrors.SendValueErrors.dust
-            }
-
-            return SelectedUnspentOutputInfo(unspentOutputs: selectedOutputs, recipientValue: withChangeRecipientValue, changeValue: totalValue - withChangeSentValue)
+        // if total selected unspentOutputs value more than value and fee for transaction with change output + change input -> add fee for change output and mark as need change address
+        var addChangeOutput = false
+        if totalValue > value + lastCalculatedFee + (senderPay ? dust : 0) {
+            lastCalculatedFee = calculator.transactionSize(inputs: selectedOutputScriptTypes, outputScriptTypes: [outputScriptType, changeType]) * feeRate
+            addChangeOutput = true
+        } else if senderPay {
+            lastCalculatedFee = totalValue - value
         }
-
-        // No change needed
-        return SelectedUnspentOutputInfo(unspentOutputs: selectedOutputs, recipientValue: recipientValue, changeValue: nil)
+        return SelectedUnspentOutputInfo(unspentOutputs: selectedOutputs, totalValue: totalValue, fee: lastCalculatedFee, addChangeOutput: addChangeOutput)
     }
 
 }

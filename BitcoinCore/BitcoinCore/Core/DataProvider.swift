@@ -8,12 +8,12 @@ class DataProvider {
     private let disposeBag = DisposeBag()
 
     private let storage: IStorage
-    private let balanceProvider: IBalanceProvider
+    private let unspentOutputProvider: IUnspentOutputProvider
     private let transactionInfoConverter: ITransactionInfoConverter
 
     private let balanceUpdateSubject = PublishSubject<Void>()
 
-    public var balance: BalanceInfo {
+    public var balance: Int = 0 {
         didSet {
             if !(oldValue == balance) {
                 delegate?.balanceUpdated(balance: balance)
@@ -24,20 +24,20 @@ class DataProvider {
 
     weak var delegate: IDataProviderDelegate?
 
-    init(storage: IStorage, balanceProvider: IBalanceProvider, transactionInfoConverter: ITransactionInfoConverter, throttleTimeMilliseconds: Int = 500) {
+    init(storage: IStorage, unspentOutputProvider: IUnspentOutputProvider, transactionInfoConverter: ITransactionInfoConverter, throttleTimeMilliseconds: Int = 500) {
         self.storage = storage
-        self.balanceProvider = balanceProvider
+        self.unspentOutputProvider = unspentOutputProvider
         self.transactionInfoConverter = transactionInfoConverter
-        self.balance = balanceProvider.balanceInfo
+        self.balance = unspentOutputProvider.allUnspentOutputs.map { $0.output.value }.reduce(0, +)
         self.lastBlockInfo = storage.lastBlock.map { blockInfo(fromBlock: $0) }
 
         balanceUpdateSubject.throttle(DispatchTimeInterval.milliseconds(throttleTimeMilliseconds), scheduler: ConcurrentDispatchQueueScheduler(qos: .background)).subscribe(onNext: { [weak self] in
-            self?.balance = balanceProvider.balanceInfo
+            self?.balance = unspentOutputProvider.allUnspentOutputs.map { $0.output.value }.reduce(0, +)
         }).disposed(by: disposeBag)
     }
 
     private func blockInfo(fromBlock block: Block) -> BlockInfo {
-        BlockInfo(
+        return BlockInfo(
                 headerHash: block.headerHash.reversedHex,
                 height: block.height,
                 timestamp: block.timestamp
@@ -84,7 +84,7 @@ extension DataProvider: IBlockchainDataListener {
 extension DataProvider: IDataProvider {
 
     func transactions(fromHash: String?, limit: Int?) -> Single<[TransactionInfo]> {
-        Single.create { observer in
+        return Single.create { observer in
             var fromTimestamp: Int? = nil
             var fromOrder: Int? = nil
 
@@ -100,13 +100,13 @@ extension DataProvider: IDataProvider {
         }
     }
 
-    func debugInfo(network: INetwork, scriptType: ScriptType, addressConverter: IAddressConverter) -> String {
+    var debugInfo: String {
         var lines = [String]()
 
         let pubKeys = storage.publicKeys().sorted(by: { $0.index < $1.index })
 
         for pubKey in pubKeys {
-            lines.append("acc: \(pubKey.account) - inx: \(pubKey.index) - ext: \(pubKey.external) : \((try! addressConverter.convert(keyHash: pubKey.keyHash, type: scriptType)).stringValue)")
+            lines.append("acc: \(pubKey.account) - inx: \(pubKey.index) - ext: \(pubKey.external) : \((try! Base58AddressConverter(addressVersion: 0x00, addressScriptVersion: 0x05).convert(keyHash: pubKey.keyHash, type: .p2pkh)).stringValue)")
         }
         lines.append("PUBLIC KEYS COUNT: \(pubKeys.count)")
         return lines.joined(separator: "\n")

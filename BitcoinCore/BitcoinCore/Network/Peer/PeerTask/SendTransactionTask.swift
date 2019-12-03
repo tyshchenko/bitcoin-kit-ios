@@ -7,9 +7,6 @@ class SendTransactionTask: PeerTask {
     init(transaction: FullTransaction) {
         self.transaction = transaction
     }
-    override var state: String {
-        "transaction: \(transaction.header.dataHash.reversedHex)"
-    }
 
     override func start() {
         let message = InventoryMessage(inventoryItems: [

@@ -2,12 +2,10 @@ import HSCryptoKit
 
 class TransactionOutputExtractor {
     let transactionKeySetter: ITransactionPublicKeySetter
-    let pluginManager: IPluginManager
     let logger: Logger?
 
-    init(transactionKeySetter: ITransactionPublicKeySetter, pluginManager: IPluginManager, logger: Logger? = nil) {
+    init(transactionKeySetter: ITransactionPublicKeySetter, logger: Logger? = nil) {
         self.transactionKeySetter = transactionKeySetter
-        self.pluginManager = pluginManager
         self.logger = logger
     }
 
@@ -16,8 +14,6 @@ class TransactionOutputExtractor {
 extension TransactionOutputExtractor: ITransactionExtractor {
 
     func extract(transaction: FullTransaction) {
-        var nullDataOutput: Output? = nil
-
         for output in transaction.outputs {
             var payload: Data?
             var validScriptType: ScriptType = .unknown
@@ -53,11 +49,7 @@ extension TransactionOutputExtractor: ITransactionExtractor {
                 // parse P2WPKH transaction output
                 payload = lockingScript.subdata(in: 0..<lockingScriptCount)
                 validScriptType = .p2wpkh
-            } else if lockingScriptCount > 0 && lockingScript[0] == OpCode.op_return {              // nullData output
-                payload = lockingScript.subdata(in: 0..<lockingScriptCount)
-                validScriptType = .nullData
-                nullDataOutput = output
-            }
+            }                                                                                       // We are not parsing multisig output: [M][pubKey1][pubKey2]..[pubKeyN][N][CHECKMULTISIG]
 
             output.scriptType = validScriptType
             output.keyHash = payload
@@ -65,10 +57,7 @@ extension TransactionOutputExtractor: ITransactionExtractor {
             if transactionKeySetter.set(output: output) {
                 transaction.header.isMine = true
             }
-        }
 
-        if let nullDataOutput = nullDataOutput {
-            try? pluginManager.processTransactionWithNullData(transaction: transaction, nullDataOutput: nullDataOutput)
         }
     }
 

@@ -2,17 +2,36 @@ import Foundation
 import GRDB
 
 public enum ScriptType: Int, DatabaseValueConvertible {
-    case unknown, p2pkh, p2pk, p2multi, p2sh, p2wsh, p2wpkh, p2wpkhSh, nullData
+    case unknown, p2pkh, p2pk, p2multi, p2sh, p2wsh, p2wpkh, p2wpkhSh
 
     var size: Int {
         switch self {
-        case .p2pk: return 35
-        case .p2pkh: return 25
-        case .p2sh: return 23
-        case .p2wsh: return 34
-        case .p2wpkh: return 22
-        case .p2wpkhSh: return 23
-        default: return 0
+            case .p2pk: return 35
+            case .p2pkh: return 25
+            case .p2sh: return 23
+            case .p2wsh: return 34
+            case .p2wpkh: return 22
+            case .p2wpkhSh: return 23
+            default: return 0
+        }
+    }
+
+    var keyLength: UInt8 {
+        switch self {
+            case .p2pk: return 0x21
+            case .p2pkh: return 0x14
+            case .p2sh: return 0x14
+            case .p2wsh: return 0x20
+            case .p2wpkh: return 0x14
+            case .p2wpkhSh: return 0x14
+            default: return 0
+        }
+    }
+
+    var addressType: AddressType {
+        switch self {
+            case .p2sh, .p2wsh: return .scriptHash
+            default: return .pubKeyHash
         }
     }
 
@@ -27,16 +46,12 @@ public class Output: Record {
     public var value: Int
     public var lockingScript: Data
     public var index: Int
-    public var transactionHash: Data
-    public var publicKeyPath: String? = nil
+    var transactionHash: Data
+    var publicKeyPath: String? = nil
     public var scriptType: ScriptType = .unknown
     public var redeemScript: Data? = nil
     public var keyHash: Data? = nil
     var address: String? = nil
-
-    public var pluginId: UInt8? = nil
-    public var pluginData: String? = nil
-    public var signatureScriptFunction: (([Data]) -> Data)? = nil
 
     public init(withValue value: Int, index: Int, lockingScript script: Data, transactionHash: Data = Data(), type: ScriptType = .unknown, redeemScript: Data? = nil, address: String? = nil, keyHash: Data? = nil, publicKey: PublicKey? = nil) {
         self.value = value
@@ -53,7 +68,7 @@ public class Output: Record {
     }
 
     override open class var databaseTableName: String {
-        "outputs"
+        return "outputs"
     }
 
     enum Columns: String, ColumnExpression, CaseIterable {
@@ -63,11 +78,8 @@ public class Output: Record {
         case transactionHash
         case publicKeyPath
         case scriptType
-        case redeemScript
         case keyHash
         case address
-        case pluginId
-        case pluginData
     }
 
     required init(row: Row) {
@@ -77,11 +89,8 @@ public class Output: Record {
         transactionHash = row[Columns.transactionHash]
         publicKeyPath = row[Columns.publicKeyPath]
         scriptType = row[Columns.scriptType]
-        redeemScript = row[Columns.redeemScript]
         keyHash = row[Columns.keyHash]
         address = row[Columns.address]
-        pluginId = row[Columns.pluginId]
-        pluginData = row[Columns.pluginData]
 
         super.init(row: row)
     }
@@ -93,11 +102,8 @@ public class Output: Record {
         container[Columns.transactionHash] = transactionHash
         container[Columns.publicKeyPath] = publicKeyPath
         container[Columns.scriptType] = scriptType
-        container[Columns.redeemScript] = redeemScript
         container[Columns.keyHash] = keyHash
         container[Columns.address] = address
-        container[Columns.pluginId] = pluginId
-        container[Columns.pluginData] = pluginData
     }
 
 }

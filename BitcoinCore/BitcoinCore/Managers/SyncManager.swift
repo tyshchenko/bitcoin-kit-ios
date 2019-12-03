@@ -6,7 +6,6 @@ class SyncManager {
     private let reachabilityManager: IReachabilityManager
     private let initialSyncer: IInitialSyncer
     private let peerGroup: IPeerGroup
-    private let queue = DispatchQueue(label: "SyncManagerQueue", qos: .background)
 
     init(reachabilityManager: IReachabilityManager, initialSyncer: IInitialSyncer, peerGroup: IPeerGroup) {
         self.reachabilityManager = reachabilityManager
@@ -15,20 +14,14 @@ class SyncManager {
     }
 
     private func startSync() {
-        guard reachabilityManager.isReachable else {
-            return
-        }
-
-        queue.async { [weak self] in
-            self?.initialSyncer.sync()
+        if reachabilityManager.isReachable {
+            initialSyncer.sync()
         }
     }
 
     private func stopSync() {
-        queue.async { [weak self] in
-            self?.initialSyncer.stop()
-            self?.peerGroup.stop()
-        }
+        initialSyncer.stop()
+        peerGroup.stop()
     }
 
     private func onReachabilityChanged() {
@@ -51,7 +44,7 @@ extension SyncManager: ISyncManager {
                 })
                 .disposed(by: disposeBag)
 
-        startSync()
+        initialSyncer.sync()
     }
 
     func stop() {
@@ -64,10 +57,8 @@ extension SyncManager: ISyncManager {
 extension SyncManager: IInitialSyncerDelegate {
 
     func syncingFinished() {
-        queue.async { [weak self] in
-            self?.initialSyncer.stop()
-            self?.peerGroup.start()
-        }
+        initialSyncer.stop()
+        peerGroup.start()
     }
 
 }

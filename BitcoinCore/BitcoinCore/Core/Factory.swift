@@ -10,15 +10,15 @@ class Factory: IFactory {
     }
 
     func block(withHeader header: BlockHeader, previousBlock: Block) -> Block {
-        Block(withHeader: header, previousBlock: previousBlock)
+        return Block(withHeader: header, previousBlock: previousBlock)
     }
 
     func block(withHeader header: BlockHeader, height: Int) -> Block {
-        Block(withHeader: header, height: height)
+        return Block(withHeader: header, height: height)
     }
 
     func transaction(version: Int, lockTime: Int) -> Transaction {
-        Transaction(version: version, lockTime: lockTime)
+        return Transaction(version: version, lockTime: lockTime)
     }
 
     func inputToSign(withPreviousOutput previousOutput: UnspentOutput, script: Data, sequence: Int) -> InputToSign {
@@ -30,20 +30,20 @@ class Factory: IFactory {
         return InputToSign(input: input, previousOutput: previousOutput.output, previousOutputPublicKey: previousOutput.publicKey)
     }
 
-    func output(withIndex index: Int, address: Address, value: Int, publicKey: PublicKey?) throws -> Output {
-        Output(withValue: value, index: index, lockingScript: address.lockingScript, type: address.scriptType, address: address.stringValue, keyHash: address.keyHash, publicKey: publicKey)
+    func output(withValue value: Int, index: Int, lockingScript script: Data = Data(), type: ScriptType, address: String?, keyHash: Data?, publicKey: PublicKey?) -> Output {
+        return Output(withValue: value, index: index, lockingScript: script, type: type, address: address, keyHash: keyHash, publicKey: publicKey)
     }
 
     func peer(withHost host: String, logger: Logger? = nil) -> IPeer {
-        Peer(host: host, network: network, connection: PeerConnection(host: host, port: network.port, networkMessageParser: networkMessageParser, networkMessageSerializer: networkMessageSerializer, logger: logger), connectionTimeoutManager: ConnectionTimeoutManager(), logger: logger)
+        return Peer(host: host, network: network, connection: PeerConnection(host: host, port: network.port, networkMessageParser: networkMessageParser, networkMessageSerializer: networkMessageSerializer, logger: logger), connectionTimeoutManager: ConnectionTimeoutManager(), logger: logger)
     }
 
     func blockHash(withHeaderHash headerHash: Data, height: Int, order: Int = 0) -> BlockHash {
-        BlockHash(headerHash: headerHash, height: height, order: order)
+        return BlockHash(headerHash: headerHash, height: height, order: order)
     }
 
     func bloomFilter(withElements elements: [Data]) -> BloomFilter {
-        BloomFilter(elements: elements)
+        return BloomFilter(elements: elements)
     }
 
 }

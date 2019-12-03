@@ -158,19 +158,6 @@ open class GrdbStorage {
             try db.execute(sql: "UPDATE \(Block.databaseTableName) SET \(Block.Columns.timestamp.name) = 1559256184 WHERE \(Block.Columns.height.name) == 578592 AND \(Block.Columns.timestamp.name) == 1559277784")
         }
 
-        migrator.registerMigration("addRedeemScriptToOutput") { db in
-            try db.alter(table: Output.databaseTableName) { t in
-                t.add(column: Output.Columns.redeemScript.name, .blob)
-            }
-        }
-
-        migrator.registerMigration("addPluginInfoToOutput") { db in
-            try db.alter(table: Output.databaseTableName) { t in
-                t.add(column: Output.Columns.pluginId.name, .integer)
-                t.add(column: Output.Columns.pluginData.name, .text)
-            }
-        }
-
         return migrator
     }
 
@@ -180,7 +167,7 @@ extension GrdbStorage: IStorage {
     // BlockchainState
 
     public var initialRestored: Bool? {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try BlockchainState.fetchOne(db)?.initialRestored
         }
     }
@@ -196,7 +183,7 @@ extension GrdbStorage: IStorage {
     // PeerAddress
 
     public func leastScoreFastestPeerAddress(excludingIps: [String]) -> PeerAddress? {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try PeerAddress
                     .filter(!excludingIps.contains(PeerAddress.Columns.ip))
                     .order(PeerAddress.Columns.score.asc, PeerAddress.Columns.connectionTime.asc)
@@ -239,25 +226,25 @@ extension GrdbStorage: IStorage {
     // BlockHash
 
     public var blockchainBlockHashes: [BlockHash] {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try BlockHash.filter(BlockHash.Columns.height == 0).fetchAll(db)
         }
     }
 
     public var lastBlockchainBlockHash: BlockHash? {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try BlockHash.filter(BlockHash.Columns.height == 0).order(BlockHash.Columns.sequence.desc).fetchOne(db)
         }
     }
 
     public var lastBlockHash: BlockHash? {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try BlockHash.order(BlockHash.Columns.sequence.desc).fetchOne(db)
         }
     }
 
     public var blockHashHeaderHashes: [Data] {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             let rows = try Row.fetchCursor(db, sql: "SELECT headerHash from blockHashes")
             var hashes = [Data]()
 
@@ -270,7 +257,7 @@ extension GrdbStorage: IStorage {
     }
 
     public func blockHashHeaderHashes(except excludedHash: Data) -> [String] {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             let rows = try Row.fetchCursor(db, sql: "SELECT headerHash from blockHashes WHERE headerHash != ?", arguments: [excludedHash])
             var hexes = [String]()
 
@@ -283,7 +270,7 @@ extension GrdbStorage: IStorage {
     }
 
     public func blockHashesSortedBySequenceAndHeight(limit: Int) -> [BlockHash] {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try BlockHash.order(BlockHash.Columns.sequence.asc).order(BlockHash.Columns.height.asc).limit(limit).fetchAll(db)
         }
     }
@@ -321,19 +308,19 @@ extension GrdbStorage: IStorage {
     // Block
 
     public var blocksCount: Int {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try Block.fetchCount(db)
         }
     }
 
     public var lastBlock: Block? {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try Block.order(Block.Columns.height.desc).fetchOne(db)
         }
     }
 
     public func blocksCount(headerHashes: [Data]) -> Int {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try Block.filter(headerHashes.contains(Block.Columns.headerHash)).fetchCount(db)
         }
     }
@@ -351,49 +338,49 @@ extension GrdbStorage: IStorage {
     }
 
     public func blocks(heightGreaterThan leastHeight: Int, sortedBy sortField: Block.Columns, limit: Int) -> [Block] {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try Block.filter(Block.Columns.height > leastHeight).order(sortField.desc).limit(limit).fetchAll(db)
         }
     }
 
     public func blocks(from startHeight: Int, to endHeight: Int, ascending: Bool) -> [Block] {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try Block.filter(Block.Columns.height >= startHeight).filter(Block.Columns.height <= endHeight).order(ascending ? Block.Columns.height.asc : Block.Columns.height.desc).fetchAll(db)
         }
     }
 
     public func blocks(byHexes hexes: [String]) -> [Block] {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try Block.filter(hexes.contains(Block.Columns.headerHash)).fetchAll(db)
         }
     }
 
     public func blocks(heightGreaterThanOrEqualTo height: Int, stale: Bool) -> [Block] {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try Block.filter(Block.Columns.stale == stale).filter(Block.Columns.height >= height).fetchAll(db)
         }
     }
 
     public func blocks(stale: Bool) -> [Block] {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try Block.filter(Block.Columns.stale == stale).fetchAll(db)
         }
     }
 
     public func block(byHeight height: Int) -> Block? {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try Block.filter(Block.Columns.height == height).fetchOne(db)
         }
     }
 
     public func block(byHash hash: Data) -> Block? {
-        try! dbPool.read { db in
-            try Block.filter(Block.Columns.headerHash == hash).fetchOne(db)
+        return try! dbPool.read { db in
+            return try Block.filter(Block.Columns.headerHash == hash).fetchOne(db)
         }
     }
 
     public func block(stale: Bool, sortedHeight: String) -> Block? {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             let order = sortedHeight == "ASC" ? Block.Columns.height.asc : Block.Columns.height.desc
             return try Block.filter(Block.Columns.stale == stale).order(order).fetchOne(db)
         }
@@ -426,48 +413,31 @@ extension GrdbStorage: IStorage {
         }
     }
 
-    public func timestamps(from startHeight: Int, to endHeight: Int) -> [Int] {
-        try! dbPool.read { db in
-            var timestamps = [Int]()
-
-            let sql = "SELECT blocks.timestamp FROM blocks WHERE blocks.height >= \(startHeight) AND blocks.height <= \(endHeight) ORDER BY blocks.timestamp ASC"
-            let rows = try Row.fetchCursor(db, sql: sql)
-
-            while let row = try rows.next() {
-                if let timestamp = Int.fromDatabaseValue(row["timestamp"]) {
-                    timestamps.append(timestamp)
-                }
-            }
-
-            return timestamps
-        }
-    }
-
     // Transaction
     public func transaction(byHash hash: Data) -> Transaction? {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try Transaction.filter(Transaction.Columns.dataHash == hash).fetchOne(db)
         }
     }
 
     public func transactionExists(byHash hash: Data) -> Bool {
-        transaction(byHash: hash) != nil
+        return transaction(byHash: hash) != nil
     }
 
     public func transactions(ofBlock block: Block) -> [Transaction] {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try Transaction.filter(Transaction.Columns.blockHash == block.headerHash).fetchAll(db)
         }
     }
 
     public func newTransactions() -> [Transaction] {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try Transaction.filter(Transaction.Columns.status == TransactionStatus.new).fetchAll(db)
         }
     }
 
     public func newTransaction(byHash hash: Data) -> Transaction? {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try Transaction
                     .filter(Transaction.Columns.status == TransactionStatus.new)
                     .filter(Transaction.Columns.dataHash == hash)
@@ -476,7 +446,7 @@ extension GrdbStorage: IStorage {
     }
 
     public func relayedTransactionExists(byHash hash: Data) -> Bool {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try Transaction
                     .filter(Transaction.Columns.status == TransactionStatus.relayed)
                     .filter(Transaction.Columns.dataHash == hash)
@@ -535,8 +505,8 @@ extension GrdbStorage: IStorage {
             }
         }
 
-        let inputsByTransaction: [Data: [InputWithPreviousOutput]] = Dictionary(grouping: inputs, by: { $0.input.transactionHash })
-        let outputsByTransaction: [Data: [Output]] = Dictionary(grouping: outputs, by: { $0.transactionHash })
+        var inputsByTransaction: [Data: [InputWithPreviousOutput]] = Dictionary(grouping: inputs, by: { $0.input.transactionHash })
+        var outputsByTransaction: [Data: [Output]] = Dictionary(grouping: outputs, by: { $0.transactionHash })
         var results = [FullTransactionForInfo]()
 
         for transactionWithBlock in transactionsWithBlocks {
@@ -624,7 +594,7 @@ extension GrdbStorage: IStorage {
     // Inputs and Outputs
 
     public func outputsWithPublicKeys() -> [OutputWithPublicKey] {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             let outputC = Output.Columns.allCases.count
             let publicKeyC = PublicKey.Columns.allCases.count
             let inputC = Input.Columns.allCases.count
@@ -655,7 +625,7 @@ extension GrdbStorage: IStorage {
     }
 
     public func unspentOutputs() -> [UnspentOutput] {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             let inputs = try Input.fetchAll(db)
 
             let outputC = Output.Columns.allCases.count
@@ -692,19 +662,19 @@ extension GrdbStorage: IStorage {
     }
 
     public func inputs(transactionHash: Data) -> [Input] {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try Input.filter(Input.Columns.transactionHash == transactionHash).fetchAll(db)
         }
     }
 
     public func outputs(transactionHash: Data) -> [Output] {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try Output.filter(Output.Columns.transactionHash == transactionHash).fetchAll(db)
         }
     }
 
     public func previousOutput(ofInput input: Input) -> Output? {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try Output
                     .filter(Output.Columns.transactionHash == input.previousOutputTxHash)
                     .filter(Output.Columns.index == input.previousOutputIndex)
@@ -715,7 +685,7 @@ extension GrdbStorage: IStorage {
 
     // SentTransaction
     public func sentTransaction(byHash hash: Data) -> SentTransaction? {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try SentTransaction.filter(SentTransaction.Columns.dataHash == hash).fetchOne(db)
         }
     }
@@ -734,19 +704,19 @@ extension GrdbStorage: IStorage {
 
     // PublicKeys
     public func publicKeys() -> [PublicKey] {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try PublicKey.fetchAll(db)
         }
     }
 
     public func publicKey(byScriptHashForP2WPKH hash: Data) -> PublicKey? {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try PublicKey.filter(PublicKey.Columns.scriptHashForP2WPKH == hash).fetchOne(db)
         }
     }
 
     public func publicKey(byRawOrKeyHash hash: Data) -> PublicKey? {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try PublicKey.filter(PublicKey.Columns.raw == hash || PublicKey.Columns.keyHash == hash).fetchOne(db)
         }
     }
@@ -760,7 +730,7 @@ extension GrdbStorage: IStorage {
     }
 
     public func publicKeysWithUsedState() -> [PublicKeyWithUsedState] {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             let publicKeyC = PublicKey.Columns.allCases.count
 
             let adapter = ScopeAdapter([
@@ -784,7 +754,7 @@ extension GrdbStorage: IStorage {
     }
 
     public func publicKey(byPath path: String) -> PublicKey? {
-        try! dbPool.read { db in
+        return try! dbPool.read { db in
             try PublicKey.filter(PublicKey.Columns.path == path).fetchOne(db)
         }
     }
