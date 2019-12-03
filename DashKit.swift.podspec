@@ -7,13 +7,13 @@ Pod::Spec.new do |spec|
                        DashKit implements Dash protocol in Swift.
                        ```
                     DESC
-  spec.homepage = 'https://github.com/horizontalsystems/bitcoin-kit-ios'
+  spec.homepage = 'https://github.com/tyshchenko/bitcoin-kit-ios'
   spec.license = { :type => 'Apache 2.0', :file => 'LICENSE' }
   spec.author = { 'Horizontal Systems' => 'hsdao@protonmail.ch' }
   spec.social_media_url = 'http://horizontalsystems.io/'
 
   spec.requires_arc = true
-  spec.source = { git: 'https://github.com/horizontalsystems/bitcoin-kit-ios.git', tag: "#{spec.version}" }
+  spec.source = { git: 'https://github.com/tyshchenko/bitcoin-kit-ios.git', tag: "#{spec.version}" }
   spec.source_files = 'DashKit/DashKit/**/*.{h,m,mm,swift}'
   spec.ios.deployment_target = '11.0'
   spec.swift_version = '5'
