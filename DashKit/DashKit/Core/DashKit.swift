@@ -50,7 +50,7 @@ public class DashKit: AbstractKit {
         let instantTransactionState = InstantTransactionState()
         let instantTransactionManager = InstantTransactionManager(storage: storage, instantSendFactory: instantSendFactory, instantTransactionState: instantTransactionState)
 
-        dashTransactionInfoConverter = DashTransactionInfoConverter(instantTransactionManager: instantTransactionManager)
+        dashTransactionInfoConverter = DashTransactionInfoConverter(baseTransactionInfoConverter: BaseTransactionInfoConverter(), instantTransactionManager: instantTransactionManager)
 
         let bitcoinCore = try BitcoinCoreBuilder(minLogLevel: minLogLevel)
                 .set(network: network)
@@ -141,15 +141,15 @@ public class DashKit: AbstractKit {
     }
 
     private func cast(transactionInfos:[TransactionInfo]) -> [DashTransactionInfo] {
-        transactionInfos.compactMap { $0 as? DashTransactionInfo }
+        return transactionInfos.compactMap { $0 as? DashTransactionInfo }
     }
 
-    public override func send(to address: String, value: Int, feeRate: Int, pluginData: [UInt8: IPluginData]) throws -> FullTransaction {
-        try super.send(to: address, value: value, feeRate: feeRate)
+    public override func send(to address: String, value: Int, feeRate: Int) throws -> FullTransaction {
+        return try super.send(to: address, value: value, feeRate: feeRate)
     }
 
     public func transactions(fromHash: String?, limit: Int?) -> Single<[DashTransactionInfo]> {
-        super.transactions(fromHash: fromHash, limit: limit).map { self.cast(transactionInfos: $0) }
+        return super.transactions(fromHash: fromHash, limit: limit).map { self.cast(transactionInfos: $0) }
     }
 
 }
@@ -167,7 +167,7 @@ extension DashKit: BitcoinCoreDelegate {
         delegate?.transactionsDeleted(hashes: hashes)
     }
 
-    public func balanceUpdated(balance: BalanceInfo) {
+    public func balanceUpdated(balance: Int) {
         delegate?.balanceUpdated(balance: balance)
     }
 
@@ -212,7 +212,7 @@ extension DashKit {
     }
 
     private static func databaseFileName(walletId: String, networkType: NetworkType) -> String {
-        "\(walletId)-\(networkType.rawValue)"
+        return "\(walletId)-\(networkType.rawValue)"
     }
 
 }

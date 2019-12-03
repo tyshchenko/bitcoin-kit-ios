@@ -1,10 +1,11 @@
 import BitcoinCore
 
 class DashTransactionInfoConverter: ITransactionInfoConverter {
-    public var baseTransactionInfoConverter: IBaseTransactionInfoConverter!
+    private let baseTransactionInfoConverter: IBaseTransactionInfoConverter
     private let instantTransactionManager: IInstantTransactionManager
 
-    init(instantTransactionManager: IInstantTransactionManager) {
+    init(baseTransactionInfoConverter: IBaseTransactionInfoConverter, instantTransactionManager: IInstantTransactionManager) {
+        self.baseTransactionInfoConverter = baseTransactionInfoConverter
         self.instantTransactionManager = instantTransactionManager
     }
 
