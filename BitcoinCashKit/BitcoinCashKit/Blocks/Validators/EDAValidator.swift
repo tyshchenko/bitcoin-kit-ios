@@ -1,29 +1,19 @@
 import BitcoinCore
 import BigInt
 
-class EDAValidator {
+class EDAValidator: IBlockValidator {
     private let difficultyEncoder: IBitcoinCashDifficultyEncoder
     private let blockHelper: IBitcoinCashBlockValidatorHelper
-    private let blockMedianTimeHelper: IBitcoinCashBlockMedianTimeHelper
     private let maxTargetBits: Int
     private let firstCheckpointHeight: Int
 
-    init(encoder: IBitcoinCashDifficultyEncoder, blockHelper: IBitcoinCashBlockValidatorHelper, blockMedianTimeHelper: IBitcoinCashBlockMedianTimeHelper, maxTargetBits: Int, firstCheckpointHeight: Int) {
+    init(encoder: IBitcoinCashDifficultyEncoder, blockHelper: IBitcoinCashBlockValidatorHelper, maxTargetBits: Int, firstCheckpointHeight: Int) {
         difficultyEncoder = encoder
         self.blockHelper = blockHelper
-        self.blockMedianTimeHelper = blockMedianTimeHelper
 
         self.maxTargetBits = maxTargetBits
         self.firstCheckpointHeight = firstCheckpointHeight
     }
-
-    private func medianTimePast(block: Block) -> Int {
-        blockMedianTimeHelper.medianTimePast(block: block) ?? block.height
-    }
-
-}
-
-extension EDAValidator: IBlockValidator {
 
     func validate(block: Block, previousBlock: Block) throws {
         guard previousBlock.height >= firstCheckpointHeight + 6 else {
@@ -39,7 +29,7 @@ extension EDAValidator: IBlockValidator {
         guard let cursorBlock = blockHelper.previous(for: previousBlock, count: 6) else {
             throw BitcoinCoreErrors.BlockValidation.noPreviousBlock
         }
-        let mpt6blocks = medianTimePast(block: previousBlock) - medianTimePast(block: cursorBlock)
+        let mpt6blocks = blockHelper.medianTimePast(block: previousBlock) - blockHelper.medianTimePast(block: cursorBlock)
         if(mpt6blocks >= 12 * 3600) {
             let decodedBits = difficultyEncoder.decodeCompact(bits: previousBlock.bits)
             let pow = decodedBits >> 2
@@ -57,7 +47,7 @@ extension EDAValidator: IBlockValidator {
     }
 
     func isBlockValidatable(block: Block, previousBlock: Block) -> Bool {
-        true
+        return true
     }
 
 }
