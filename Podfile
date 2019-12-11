@@ -10,6 +10,7 @@ project 'BitcoinCore/BitcoinCore'
 project 'BitcoinKit/BitcoinKit'
 project 'BitcoinCashKit/BitcoinCashKit'
 project 'DashKit/DashKit'
+project 'LitecoinKit/LitecoinKit'
 project 'Hodler/Hodler'
 
 def internal_pods
@@ -44,6 +45,14 @@ end
 
 target :DashKit do
     project 'DashKit/DashKit'
+    kit_pods
+
+    pod 'CryptoBLS.swift', '~> 1.1'
+    pod 'CryptoX11.swift', '~> 1.1'
+end
+
+target :LitecoinKit do
+    project 'LitecoinKit/LitecoinKit'
     kit_pods
 
     pod 'CryptoBLS.swift', '~> 1.1'
