@@ -9,6 +9,7 @@ project 'Demo/Demo'
 project 'BitcoinCore/BitcoinCore'
 project 'BitcoinKit/BitcoinKit'
 project 'BitcoinCashKit/BitcoinCashKit'
+project 'BitcoinSVKit/BitcoinSVKit'
 project 'DashKit/DashKit'
 project 'LitecoinKit/LitecoinKit'
 project 'Hodler/Hodler'
@@ -40,6 +41,11 @@ end
 
 target :BitcoinCashKit do
     project 'BitcoinCashKit/BitcoinCashKit'
+    kit_pods
+end
+
+target :BitcoinSVKit do
+    project 'BitcoinSVKit/BitcoinSVKit'
     kit_pods
 end
 
