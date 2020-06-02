@@ -1,29 +1,27 @@
 import BitcoinCore
 
 class MainNet: INetwork {
+    let bundleName = "LitecoinKit"
 
-    let name = "bitcoin-main-net"
-    let pubKeyHash: UInt8 = 0x00
-    let privateKey: UInt8 = 0x80
-    let scriptHash: UInt8 = 0x05
-    let bech32PrefixPattern: String = "bc"
+    let pubKeyHash: UInt8 = 0x30
+    let privateKey: UInt8 = 0xb0
+    let scriptHash: UInt8 = 0x32
+    let bech32PrefixPattern: String = "ltc"
     let xPubKey: UInt32 = 0x0488b21e
     let xPrivKey: UInt32 = 0x0488ade4
-    let magic: UInt32 = 0xf9beb4d9
-    let port: UInt32 = 8333
-    let coinType: UInt32 = 0
+    let magic: UInt32 = 0xfbc0b6db
+    let port: UInt32 = 9333
+    let coinType: UInt32 = 2
     let sigHash: SigHashType = .bitcoinAll
     var syncableFromApi: Bool = true
 
     let dnsSeeds = [
-        "seed.bitcoin.sipa.be",         // Pieter Wuille
-        "dnsseed.bluematt.me",          // Matt Corallo
-        "dnsseed.bitcoin.dashjr.org",   // Luke Dashjr
-        "seed.bitcoinstats.com",        // Chris Decker
-        "seed.bitnodes.io",             // Addy Yeow
-        "seed.bitcoin.jonasschnelli.ch",// Jonas Schnelli
+        "dnsseed.litecoinpool.org",
+        "seed-a.litecoin.loshan.co.uk",
+        "dnsseed.thrasher.io",
+        "dnsseed.koin-project.com",
+        "dnsseed.litecointools.com",
     ]
-
     var bip44CheckpointBlock: Block {
         return Block(
                 withHeader: BlockHeader(
@@ -51,5 +49,6 @@ class MainNet: INetwork {
                 ),
                 height: 590688)
     }
-
+    
+    let dustRelayTxFee = 3000 // https://github.com/bitcoin/bitcoin/blob/c536dfbcb00fb15963bf5d507b7017c241718bf6/src/policy/policy.h#L50
 }

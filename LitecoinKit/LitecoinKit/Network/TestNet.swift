@@ -1,29 +1,25 @@
 import BitcoinCore
 
 class TestNet: INetwork {
-    private static let testNetDiffDate = 1329264000 // February 16th 2012
+    let bundleName = "LitecoinKit"
 
-    let name = "bitcoin-test-net"
     let pubKeyHash: UInt8 = 0x6f
     let privateKey: UInt8 = 0xef
-    let scriptHash: UInt8 = 0xc4
-    let bech32PrefixPattern: String = "tb"
+    let scriptHash: UInt8 = 0x3a
+    let bech32PrefixPattern: String = "tltc"
     let xPubKey: UInt32 = 0x043587cf
     let xPrivKey: UInt32 = 0x04358394
-    let magic: UInt32 = 0x0b110907
-    let port: UInt32 = 18333
+    let magic: UInt32 = 0xfdd2c8f1
+    let port: UInt32 = 19335
     let coinType: UInt32 = 1
     let sigHash: SigHashType = .bitcoinAll
-    var syncableFromApi: Bool = true
+    var syncableFromApi: Bool = false
 
     let dnsSeeds = [
-        "testnet-seed.bitcoin.petertodd.org",    // Peter Todd
-        "testnet-seed.bitcoin.jonasschnelli.ch", // Jonas Schnelli
-        "testnet-seed.bluematt.me",              // Matt Corallo
-        "testnet-seed.bitcoin.schildbach.de",    // Andreas Schildbach
-        "bitcoin-testnet.bloqseeds.net",         // Bloq
+        "testnet-seed.ltc.xurious.com",
+        "seed-b.litecoin.loshan.co.uk",
+        "dnsseed-testnet.thrasher.io",
     ]
-
     var bip44CheckpointBlock: Block {
         return Block(
                 withHeader: BlockHeader(
@@ -51,5 +47,5 @@ class TestNet: INetwork {
                 ),
                 height: 1574496)
     }
-
+    let dustRelayTxFee = 3000 // https://github.com/bitcoin/bitcoin/blob/c536dfbcb00fb15963bf5d507b7017c241718bf6/src/policy/policy.h#L50
 }
