@@ -46,7 +46,7 @@ public class Output: Record {
     public var value: Int
     public var lockingScript: Data
     public var index: Int
-    var transactionHash: Data
+    public var transactionHash: Data
     var publicKeyPath: String? = nil
     public var scriptType: ScriptType = .unknown
     public var redeemScript: Data? = nil
